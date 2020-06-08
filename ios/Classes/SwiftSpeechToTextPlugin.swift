@@ -292,7 +292,7 @@ public class SwiftSpeechToTextPlugin: NSObject, FlutterPlugin {
             os_log("Error stopping listen: %{PUBLIC}@", log: pluginLog, type: .error, error.localizedDescription)
         }
         do {
-            try self.audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            try self.audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         }
         catch {
             os_log("Error deactivation: %{PUBLIC}@", log: pluginLog, type: .info, error.localizedDescription)
@@ -325,7 +325,10 @@ public class SwiftSpeechToTextPlugin: NSObject, FlutterPlugin {
                 }
             }
             rememberedAudioCategory = self.audioSession.category
-            try self.audioSession.setCategory(AVAudioSession.Category.playAndRecord, options: .defaultToSpeaker)
+
+            AudioOutputUnitStop((audioEngine.inputNode.audioUnit)!)
+            AudioUnitUninitialize((audioEngine.inputNode.audioUnit)!)
+            try self.audioSession.setCategory(AVAudioSession.Category.playAndRecord, options: [.defaultToSpeaker, .mixWithOthers])
 //            try self.audioSession.setMode(AVAudioSession.Mode.measurement)
             try self.audioSession.setMode(AVAudioSession.Mode.default)
             try self.audioSession.setActive(true, options: .notifyOthersOnDeactivation)
@@ -360,7 +363,7 @@ public class SwiftSpeechToTextPlugin: NSObject, FlutterPlugin {
                 break
             }
             self.currentTask = self.recognizer?.recognitionTask(with: currentRequest, delegate: self )
-            let recordingFormat = inputNode.outputFormat(forBus: self.busForNodeTap)
+            let recordingFormat = inputNode.inputFormat(forBus: self.busForNodeTap)
             inputNode.installTap(onBus: self.busForNodeTap, bufferSize: self.speechBufferSize, format: recordingFormat) { (buffer: AVAudioPCMBuffer, when: AVAudioTime) in
                 currentRequest.append(buffer)
                 self.updateSoundLevel( buffer: buffer )

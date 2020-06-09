@@ -81,11 +81,12 @@ class SpeechToTextProvider extends ChangeNotifier {
   ///
   /// Call this only after a successful [initialize] call
   void listen(
-      {bool partialResults = false, Duration listenFor, Duration pauseFor}) {
+      {bool partialResults = false, Duration listenFor, Duration pauseFor, String localeId = "en"}) {
     _speechToText.listen(
         partialResults: partialResults,
         listenFor: listenFor,
         pauseFor: pauseFor,
+        localeId: localeId,
         cancelOnError: true,
         onResult: _onListenResult);
   }

@@ -23,10 +23,13 @@ import 'package:speech_to_text/speech_to_text.dart';
 ///   var words = speechProvider.lastWords;
 /// });
 class SpeechToTextProvider extends ChangeNotifier {
-  final StreamController<SpeechRecognitionEvent> recognitionController =
+  final StreamController<SpeechRecognitionEvent> _recognitionController =
       StreamController.broadcast();
   final SpeechToText _speechToText;
   SpeechRecognitionResult _lastResult;
+  double _lastLevel = 0;
+  List<LocaleName> _locales = [];
+  LocaleName _systemLocale;
 
   /// Only construct one instance in an application.
   ///
@@ -34,24 +37,40 @@ class SpeechToTextProvider extends ChangeNotifier {
   /// call the [initialize] method on this class.
   SpeechToTextProvider(this._speechToText);
 
+  Stream<SpeechRecognitionEvent> get stream => _recognitionController.stream;
+
   /// Returns the last result received, may be null.
   SpeechRecognitionResult get lastResult => _lastResult;
 
   /// Returns the last error received, may be null.
   SpeechRecognitionError get lastError => _speechToText.lastError;
 
+  /// Returns the last sound level received.
+  ///
+  /// Note this is only available when the `soundLevel` is set to true on
+  /// a call to [listen], will be 0 at all other times.
+  double get lastLevel => _lastLevel;
+
   /// Initializes the provider and the contained [SpeechToText] instance.
   ///
   /// Returns true if [SpeechToText] was initialized successful and can now
   /// be used, false otherwse.
   Future<bool> initialize() async {
+    if (isAvailable) {
+      return isAvailable;
+    }
     bool availableBefore = _speechToText.isAvailable;
-    bool isAvailable =
+    bool available =
         await _speechToText.initialize(onStatus: _onStatus, onError: _onError);
-    if (availableBefore != isAvailable) {
+    if (available) {
+      _locales = [];
+      _locales.addAll(await _speechToText.locales());
+      _systemLocale = await _speechToText.systemLocale();
+    }
+    if (availableBefore != available) {
       notifyListeners();
     }
-    return isAvailable;
+    return available;
   }
 
   /// Returns true if the provider has been initialized and can be used to recognize speech.
@@ -70,8 +89,20 @@ class SpeechToTextProvider extends ChangeNotifier {
   /// Returns true if [SpeechToText] has a previous error.
   bool get hasError => _speechToText.hasError;
 
+  /// Returns true if [lastResult] has a last result.
+  bool get hasResults => null != _lastResult;
+
+  /// Returns the list of locales that are available on the device for speech recognition.
+  List<LocaleName> get locales => _locales;
+
+  /// Returns the locale that is currently set as active on the device.
+  LocaleName get systemLocale => _systemLocale;
+
   /// Start listening for new events, set [partialResults] to true to receive interim
   /// recognition results.
+  ///
+  /// [soundLevel] set to true to be notified on changes to the input sound level
+  /// on the microphone.
   ///
   /// [listenFor] sets the maximum duration that it will listen for, after
   /// that it automatically stops the listen for you.
@@ -81,14 +112,28 @@ class SpeechToTextProvider extends ChangeNotifier {
   ///
   /// Call this only after a successful [initialize] call
   void listen(
-      {bool partialResults = false, Duration listenFor, Duration pauseFor, String localeId = "en"}) {
-    _speechToText.listen(
-        partialResults: partialResults,
-        listenFor: listenFor,
-        pauseFor: pauseFor,
-        localeId: localeId,
-        cancelOnError: true,
-        onResult: _onListenResult);
+      {bool partialResults = false,
+      bool soundLevel = false,
+      Duration listenFor,
+      Duration pauseFor}) {
+    _lastLevel = 0;
+    _lastResult = null;
+    if (soundLevel) {
+      _speechToText.listen(
+          partialResults: partialResults,
+          listenFor: listenFor,
+          pauseFor: pauseFor,
+          cancelOnError: true,
+          onResult: _onListenResult,
+          onSoundLevelChange: _onSoundLevelChange);
+    } else {
+      _speechToText.listen(
+          partialResults: partialResults,
+          listenFor: listenFor,
+          pauseFor: pauseFor,
+          cancelOnError: true,
+          onResult: _onListenResult);
+    }
   }
 
   /// Stops a current active listening session.
@@ -110,29 +155,46 @@ class SpeechToTextProvider extends ChangeNotifier {
   }
 
   void _onError(SpeechRecognitionError errorNotification) {
-    recognitionController.add(SpeechRecognitionEvent(
+    _recognitionController.add(SpeechRecognitionEvent(
         SpeechRecognitionEventType.errorEvent,
         null,
         errorNotification,
-        isListening));
+        isListening,
+        null));
     notifyListeners();
   }
 
   void _onStatus(String status) {
-    recognitionController.add(SpeechRecognitionEvent(
-        SpeechRecognitionEventType.statusChangeEvent, null, null, isListening));
+    _recognitionController.add(SpeechRecognitionEvent(
+        SpeechRecognitionEventType.statusChangeEvent,
+        null,
+        null,
+        isListening,
+        null));
     notifyListeners();
   }
 
   void _onListenResult(SpeechRecognitionResult result) {
     _lastResult = result;
-    recognitionController.add(SpeechRecognitionEvent(
+    _recognitionController.add(SpeechRecognitionEvent(
         result.finalResult
             ? SpeechRecognitionEventType.finalRecognitionEvent
             : SpeechRecognitionEventType.partialRecognitionEvent,
         result,
         null,
-        isListening));
+        isListening,
+        null));
+    notifyListeners();
+  }
+
+  void _onSoundLevelChange(double level) {
+    _lastLevel = level;
+    _recognitionController.add(SpeechRecognitionEvent(
+        SpeechRecognitionEventType.soundLevelChangeEvent,
+        null,
+        null,
+        null,
+        level));
     notifyListeners();
   }
 }

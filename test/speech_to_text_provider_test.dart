@@ -1,5 +1,4 @@
 import 'package:fake_async/fake_async.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_to_text_provider.dart';
@@ -26,7 +25,6 @@ void main() {
   });
 
   tearDown(() {
-    print("tearing down channel");
     speechToText.channel.setMockMethodCallHandler(null);
   });
 
@@ -44,6 +42,10 @@ void main() {
       expect(provider.isAvailable, speechToText.isAvailable);
       expect(provider.isNotAvailable, !speechToText.isAvailable);
     });
+    test('hasError matches delegate after error', () async {
+      expect(await provider.initialize(), isTrue);
+      expect(provider.hasError, speechToText.hasError);
+    });
   });
   group('listening', () {
     test('notifies on initialize', () async {
@@ -59,6 +61,7 @@ void main() {
         setupForListen(provider, fa, speechListener);
         expect(speechListener.notified, isTrue);
         expect(speechListener.isListening, isTrue);
+        expect(provider.hasResults, isFalse);
       });
     });
     test('notifies on final words', () async {
@@ -68,10 +71,21 @@ void main() {
         speechHandler.notifyFinalWords();
         fa.flushMicrotasks();
         expect(speechListener.notified, isTrue);
+        expect(provider.hasResults, isTrue);
         var result = speechListener.recognitionResult;
         expect(result.recognizedWords,
             TestSpeechChannelHandler.secondRecognizedWords);
         expect(result.finalResult, isTrue);
+      });
+    });
+    test('hasResult false after listening before new results', () async {
+      fakeAsync((fa) {
+        setupForListen(provider, fa, speechListener);
+        speechHandler.notifyFinalWords();
+        provider.stop();
+        setupForListen(provider, fa, speechListener);
+        fa.flushMicrotasks();
+        expect(provider.hasResults, isFalse);
       });
     });
     test('notifies on partial words', () async {
@@ -81,10 +95,35 @@ void main() {
         speechHandler.notifyPartialWords();
         fa.flushMicrotasks();
         expect(speechListener.notified, isTrue);
+        expect(provider.hasResults, isTrue);
         var result = speechListener.recognitionResult;
         expect(result.recognizedWords,
             TestSpeechChannelHandler.firstRecognizedWords);
         expect(result.finalResult, isFalse);
+      });
+    });
+  });
+  group('soundLevel', () {
+    test('notifies when requested', () async {
+      fakeAsync((fa) {
+        setupForListen(provider, fa, speechListener,
+            partialResults: true, soundLevel: true);
+        speechListener.reset();
+        speechHandler.notifySoundLevel();
+        fa.flushMicrotasks();
+        expect(speechListener.notified, isTrue);
+        expect(speechListener.soundLevel, TestSpeechChannelHandler.level2);
+      });
+    });
+    test('no notification by default', () async {
+      fakeAsync((fa) {
+        setupForListen(provider, fa, speechListener,
+            partialResults: true, soundLevel: false);
+        speechListener.reset();
+        speechHandler.notifySoundLevel();
+        fa.flushMicrotasks();
+        expect(speechListener.notified, isFalse);
+        expect(speechListener.soundLevel, 0);
       });
     });
   });
@@ -113,6 +152,10 @@ void main() {
     });
   });
   group('error handling', () {
+    test('hasError matches delegate default', () async {
+      expect(await provider.initialize(), isTrue);
+      expect(provider.hasError, speechToText.hasError);
+    });
     test('notifies on error', () async {
       fakeAsync((fa) {
         provider.initialize();
@@ -124,14 +167,30 @@ void main() {
       });
     });
   });
+  group('locale', () {
+    test('locales empty before init', () async {
+      expect(provider.systemLocale, isNull);
+      expect(provider.locales, isEmpty);
+    });
+    test('set from SpeechToText after init', () async {
+      fakeAsync((fa) {
+        speechHandler.setupLocales();
+        provider.initialize();
+        fa.flushMicrotasks();
+        expect(
+            provider.systemLocale.localeId, TestSpeechChannelHandler.localeId1);
+        expect(provider.locales, hasLength(speechHandler.locales.length));
+      });
+    });
+  });
 }
 
 void setupForListen(SpeechToTextProvider provider, FakeAsync fa,
     TestSpeechListener speechListener,
-    {bool partialResults = false}) {
+    {bool partialResults = false, bool soundLevel = false}) {
   provider.initialize();
   fa.flushMicrotasks();
   speechListener.reset();
-  provider.listen(partialResults: partialResults);
+  provider.listen(partialResults: partialResults, soundLevel: soundLevel);
   fa.flushMicrotasks();
 }

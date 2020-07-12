@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -39,16 +40,18 @@ class TestSpeechChannelHandler {
       SpeechRecognitionWords(firstRecognizedWords, firstConfidence);
   static const SpeechRecognitionWords secondWords =
       SpeechRecognitionWords(secondRecognizedWords, secondConfidence);
-  final SpeechRecognitionResult firstRecognizedResult =
+  static final SpeechRecognitionResult firstRecognizedResult =
       SpeechRecognitionResult([firstWords], false);
-  final SpeechRecognitionResult secondRecognizedResult =
+  static final SpeechRecognitionResult secondRecognizedResult =
       SpeechRecognitionResult([secondWords], false);
-  final SpeechRecognitionResult finalRecognizedResult =
+  static final SpeechRecognitionResult finalRecognizedResult =
       SpeechRecognitionResult([secondWords], true);
   static const String transientErrorJson =
       '{"errorMsg":"network","permanent":false}';
   static const String permanentErrorJson =
       '{"errorMsg":"network","permanent":true}';
+  static final SpeechRecognitionError firstError =
+      SpeechRecognitionError("network", true);
   static const double level1 = 0.5;
   static const double level2 = 10;
 
@@ -103,5 +106,16 @@ class TestSpeechChannelHandler {
   void notifyTransientError() {
     _speech.processMethodCall(
         MethodCall(SpeechToText.notifyErrorMethod, transientErrorJson));
+  }
+
+  void notifySoundLevel() {
+    _speech.processMethodCall(
+        MethodCall(SpeechToText.soundLevelChangeMethod, level2));
+  }
+
+  void setupLocales() {
+    locales.clear();
+    locales.add(locale1);
+    locales.add(locale2);
   }
 }

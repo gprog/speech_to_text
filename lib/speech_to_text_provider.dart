@@ -115,6 +115,7 @@ class SpeechToTextProvider extends ChangeNotifier {
       {bool partialResults = false,
       bool soundLevel = false,
       Duration listenFor,
+      String localeId,
       Duration pauseFor}) {
     _lastLevel = 0;
     _lastResult = null;
@@ -123,6 +124,7 @@ class SpeechToTextProvider extends ChangeNotifier {
           partialResults: partialResults,
           listenFor: listenFor,
           pauseFor: pauseFor,
+          localeId: localeId,
           cancelOnError: true,
           onResult: _onListenResult,
           onSoundLevelChange: _onSoundLevelChange);
@@ -130,6 +132,7 @@ class SpeechToTextProvider extends ChangeNotifier {
       _speechToText.listen(
           partialResults: partialResults,
           listenFor: listenFor,
+          localeId: localeId,
           pauseFor: pauseFor,
           cancelOnError: true,
           onResult: _onListenResult);

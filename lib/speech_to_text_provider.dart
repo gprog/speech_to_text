@@ -127,6 +127,7 @@ class SpeechToTextProvider extends ChangeNotifier {
           localeId: localeId,
           cancelOnError: true,
           onResult: _onListenResult,
+          listenMode: ListenMode.search,
           onSoundLevelChange: _onSoundLevelChange);
     } else {
       _speechToText.listen(
@@ -135,6 +136,7 @@ class SpeechToTextProvider extends ChangeNotifier {
           localeId: localeId,
           pauseFor: pauseFor,
           cancelOnError: true,
+          listenMode: ListenMode.search,
           onResult: _onListenResult);
     }
   }
